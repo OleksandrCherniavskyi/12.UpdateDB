@@ -1,15 +1,29 @@
-from source import link_1
+from source import link_2
 import requests
-from xml.etree import ElementTree as ET
+from bs4 import BeautifulSoup
+import time
+from datetime import datetime
 
+
+
+current_datetime = datetime.now()
 session = requests.Session()
-response = session.get(link_1, verify='xml.espir.crt')
+response = session.get(link_2, verify='xml.espir.crt', )
 
-if response.status_code == 200:
-    with response as response:
-        tree = ET.parse(response.text)
-        root = tree.getroot()
+soup = BeautifulSoup(response.content,  "lxml")
 
+products = soup.find('products')
+e = []
+q = []
+for product in products:
 
-        for product in root.findall('product')[0:1]:
-            print(product.attrib)
+    x_e = product.find('e').text
+    x_q = product.find('q').text
+    e.append(x_e)
+    q.append(x_q)
+
+history_products_dict = {
+   'ean': e,
+   'qty': q,
+   'date': current_datetime,
+}
