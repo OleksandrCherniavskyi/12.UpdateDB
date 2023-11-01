@@ -1,55 +1,44 @@
-import psycopg2
 import schedule
 from source import link_1, link_2
 from datetime import datetime
 import requests
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from bs4 import BeautifulSoup
 import time
 from query import create_products_table, create_history_products_table, exiting_product_query
 import warnings
 
 
-# Database connection parameters
-db_params = {
-    'dbname': 'postgres',
-    'user': 'postgres',
-    'password': '885531',
-    'host': 'localhost',
-    'port': '5432',
-}
-engine = create_engine('postgresql://postgres:885531@localhost:5432')
+engine = create_engine('postgresql+psycopg2://postgres:885531@localhost:5432')
 
 # Now you can execute SQL queries
 def create_db():
     # Create a connection to the database
     session = requests.Session()
     print('Connection to DB')
-    connection = psycopg2.connect(**db_params)
+    connection = engine.connect()
+    #connection.autocommit = True
 
-    connection.autocommit = True
-    cursor = connection.cursor()
     # Record the start time
     start_time = time.time()
     # create table
-    cursor.execute(create_products_table)
+    connection.execute(create_products_table)
     print('Create table products if not exists')
-    cursor.execute(create_history_products_table)
+    connection.commit()
+    connection.execute(create_history_products_table)
     print('Create table history_products if not exists')
-
+    connection.commit()
     # Check if the table is not empty
-    cursor.execute("SELECT COUNT(*) FROM products;")
-    row_count = cursor.fetchone()[0]
+    result = connection.execute(text("SELECT COUNT(*) FROM products;"))
+    row_count = result.fetchone()[0]
     print(f'Rows in products table:', row_count)
     # If the table is not empty, call the update_table function
     if row_count > 0:
         print("Check to update data")
         updatebd2()
     else:
-
         print('Parsing XML')
-
         response = session.get(link_1, verify='xml.espir.crt')
         warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
         soup = BeautifulSoup(response.content, "lxml")
@@ -91,14 +80,16 @@ def create_db():
 
         product_df = pd.DataFrame(product_dict, columns=['ean', 'symbol', 'qty', 'model', 'sizechart'])
         product_df = product_df.sort_values(by='ean')
-        product_df.to_sql("products", engine, if_exists='append', index=False)
+        product_df.to_sql("products", connection, if_exists='append', index=False)
+        connection.commit()
         print("Add data to products table")
         # Check if the table is not empty
-        cursor.execute("SELECT COUNT(*) FROM products;")
-        row_count = cursor.fetchone()[0]
+        result = connection.execute(text("SELECT COUNT(*) FROM products;"))
+        row_count = result.fetchone()[0]
         print(f'Rows in products table:', row_count)
         history_products_df = pd.DataFrame(history_products_dict, columns=['ean', 'qty', 'date'])
-        history_products_df.to_sql("history_products", engine, if_exists='append', index=False)
+        history_products_df.to_sql("history_products", connection, if_exists='append', index=False)
+        connection.commit()
         # Record the end time
         end_time = time.time()
 
@@ -108,10 +99,8 @@ def create_db():
         print(f"DB created in  {elapsed_time} seconds")
         session.close()
 
-        cursor.close()
         connection.close()
         print("Database connection closed")
-
 
 
 def update_db():
@@ -120,10 +109,8 @@ def update_db():
 
     # Create a connection to the database
     session = requests.Session()
-    connection = psycopg2.connect(**db_params)
+    connection = engine.connect()
     print('Connection to DB')
-    connection.autocommit = True
-    cursor = connection.cursor()
 
     response = session.get(link_2, verify='xml.espir.crt', )
     warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
@@ -171,13 +158,11 @@ def update_db():
     }
     compared_df = pd.DataFrame(compared_dict, columns=['ean', 'qty', 'my_id', 'symbol', 'model'])
 
-
-    cursor.execute(exiting_product_query)
-    exiting_product = pd.DataFrame(cursor.fetchall(), columns=['ean', 'qty', 'my_id'])
+    exiting = connection.execute(exiting_product_query)
+    exiting_product = pd.DataFrame(exiting.fetchall(), columns=['ean', 'qty', 'my_id'])
     changed = compared_df["my_id"].isin(exiting_product['my_id'])
     changed_qty = compared_df[~changed]
 
-    cursor.close()
     connection.close()
     print("Database connection closed")
 
@@ -198,17 +183,15 @@ def updatebd2():
     start_time = time.time()
 
     # Create a connection to the database
-
-    connection = psycopg2.connect(**db_params)
+    connection = engine.connect()
     print('Connection to DB')
-    connection.autocommit = True
-    cursor = connection.cursor()
 
     new_columns = ['ean', 'qty']
     new_df = compared[new_columns].copy()
     current_datetime = datetime.now()
     new_df['date'] = current_datetime
-    new_df.to_sql("history_products", engine, if_exists='append', index=False)
+    new_df.to_sql("history_products", connection, if_exists='append', index=False)
+    connection.commit()
     print('Update table history product')
 
     for index, row in compared.iterrows():
@@ -217,15 +200,12 @@ def updatebd2():
         symbol = row['symbol']
         model = row['model']
 
-        update_query = f"INSERT INTO products (ean, qty, symbol, model) VALUES ({ean}, {qty}, '{symbol}', '{model}') ON CONFLICT (ean) DO UPDATE SET qty = {qty}"
+        update_query = text(f"INSERT INTO products (ean, qty, symbol, model) VALUES ({ean}, {qty}, '{symbol}', '{model}') ON CONFLICT (ean) DO UPDATE SET qty = {qty}")
 
-        cursor.execute(update_query)
+        connection.execute(update_query)
     connection.commit()
 
     print('Update table Product')
-
-
-    cursor.close()
     connection.close()
     print("Database connection closed")
 
@@ -237,16 +217,9 @@ def updatebd2():
 
 create_db()
 
-
-
 schedule.every(1).minutes.do(create_db)
 
 # Run an infinite loop to execute the scheduled tasks
 while True:
     schedule.run_pending()
     time.sleep(1)
-
-
-
-
-
