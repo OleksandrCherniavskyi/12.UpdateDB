@@ -21,14 +21,13 @@ db_params = {
 }
 engine = create_engine('postgresql://postgres:885531@localhost:5432')
 
-
-
 # Now you can execute SQL queries
 def create_db():
     # Create a connection to the database
     session = requests.Session()
     print('Connection to DB')
     connection = psycopg2.connect(**db_params)
+
     connection.autocommit = True
     cursor = connection.cursor()
     # Record the start time
