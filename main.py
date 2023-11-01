@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 from bs4 import BeautifulSoup
 import time
 from query import create_products_table, create_history_products_table, exiting_product_query
+import warnings
 
 
 # Database connection parameters
@@ -26,6 +27,7 @@ engine = create_engine('postgresql://postgres:885531@localhost:5432')
 def create_db():
     # Create a connection to the database
     session = requests.Session()
+    print('Connection to DB')
     connection = psycopg2.connect(**db_params)
     connection.autocommit = True
     cursor = connection.cursor()
@@ -33,25 +35,24 @@ def create_db():
     start_time = time.time()
     # create table
     cursor.execute(create_products_table)
-    print('Create table products')
+    print('Create table products if not exists')
     cursor.execute(create_history_products_table)
-    print('Create table history_products')
+    print('Create table history_products if not exists')
 
     # Check if the table is not empty
     cursor.execute("SELECT COUNT(*) FROM products;")
-
     row_count = cursor.fetchone()[0]
     print(f'Rows in products table:', row_count)
     # If the table is not empty, call the update_table function
     if row_count > 0:
-        print("Check new data")
+        print("Check to update data")
         updatebd2()
     else:
 
-        print('parsing')
+        print('Parsing XML')
 
         response = session.get(link_1, verify='xml.espir.crt')
-
+        warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
         soup = BeautifulSoup(response.content, "lxml")
         products = soup.find('products')
         symbol = []
@@ -87,7 +88,6 @@ def create_db():
            'ean': ean,
            'qty': qty,
            'date': current_datetime,
-
         }
 
         product_df = pd.DataFrame(product_dict, columns=['ean', 'symbol', 'qty', 'model', 'sizechart'])
@@ -106,7 +106,7 @@ def create_db():
         # Calculate the elapsed time
         elapsed_time = end_time - start_time
 
-        print(f"Elapsed time for To create DB: {elapsed_time} seconds")
+        print(f"DB created in  {elapsed_time} seconds")
         session.close()
 
         cursor.close()
@@ -122,11 +122,12 @@ def update_db():
     # Create a connection to the database
     session = requests.Session()
     connection = psycopg2.connect(**db_params)
+    print('Connection to DB')
     connection.autocommit = True
     cursor = connection.cursor()
 
     response = session.get(link_2, verify='xml.espir.crt', )
-
+    warnings.filterwarnings("ignore", category=UserWarning, module="bs4")
     soup = BeautifulSoup(response.content, features="lxml")
     products = soup.find('products')
     e = []
@@ -177,7 +178,6 @@ def update_db():
     changed = compared_df["my_id"].isin(exiting_product['my_id'])
     changed_qty = compared_df[~changed]
 
-    print(changed_qty)
     cursor.close()
     connection.close()
     print("Database connection closed")
@@ -186,7 +186,7 @@ def update_db():
     end_time = time.time()
     # Calculate the elapsed time
     elapsed_time = end_time - start_time
-    print(f"Elapsed time to compared: {elapsed_time} seconds")
+    print(f"Compared data in: {elapsed_time} seconds")
     return changed_qty
 
 
@@ -201,6 +201,7 @@ def updatebd2():
     # Create a connection to the database
 
     connection = psycopg2.connect(**db_params)
+    print('Connection to DB')
     connection.autocommit = True
     cursor = connection.cursor()
 
@@ -208,7 +209,6 @@ def updatebd2():
     new_df = compared[new_columns].copy()
     current_datetime = datetime.now()
     new_df['date'] = current_datetime
-    print(f'Data to update history_products:', new_df)
     new_df.to_sql("history_products", engine, if_exists='append', index=False)
     print('Update table history product')
 
@@ -234,7 +234,7 @@ def updatebd2():
     end_time = time.time()
     # Calculate the elapsed time
     elapsed_time = end_time - start_time
-    print(f"Elapsed time to update DB2: {elapsed_time} seconds")
+    print(f"Update database in: {elapsed_time} seconds")
 
 create_db()
 
