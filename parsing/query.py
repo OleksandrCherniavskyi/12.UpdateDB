@@ -18,6 +18,7 @@ create_products_table = text('''
 
 create_history_products_table = text("""
 CREATE TABLE IF NOT EXISTS history_products (
+    id serial PRIMARY KEY,
     ean bigint,
     qty integer,
     date timestamp

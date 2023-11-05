@@ -1,0 +1,12 @@
+version: "3.8"
+services:
+  db:
+    build: ./database/
+  app_back:
+    build:
+      context: ./parsing/
+      dockerfile: Dockerfile
+  app_front:
+    build:
+      context: .
+      dockerfile: Dockerfile
