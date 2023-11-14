@@ -10,7 +10,19 @@ from query import create_products_table, create_history_products_table, exiting_
 import warnings
 
 
-engine = create_engine('postgresql+psycopg2://postgres:885531@localhost:5432')
+db_name = 'database'
+db_user = 'username'
+db_pass = 'secret'
+db_host = 'db'
+db_port = '5432'
+
+# Create the connection string
+connection_string = f'postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}'
+
+# Create the database engine
+engine = create_engine(connection_string)
+
+#engine = create_engine('postgresql+psycopg2://postgres:885531@localhost:5432')
 
 # Now you can execute SQL queries
 def create_db():
@@ -25,10 +37,10 @@ def create_db():
     # create table
     connection.execute(create_products_table)
     print('Create table products if not exists')
-    connection.commit()
+
     connection.execute(create_history_products_table)
     print('Create table history_products if not exists')
-    connection.commit()
+
     # Check if the table is not empty
     result = connection.execute(text("SELECT COUNT(*) FROM products;"))
     row_count = result.fetchone()[0]
@@ -81,7 +93,7 @@ def create_db():
         product_df = pd.DataFrame(product_dict, columns=['ean', 'symbol', 'qty', 'model', 'sizechart'])
         product_df = product_df.sort_values(by='ean')
         product_df.to_sql("products", connection, if_exists='append', index=False)
-        connection.commit()
+        #connection.commit()
         print("Add data to products table")
         # Check if the table is not empty
         result = connection.execute(text("SELECT COUNT(*) FROM products;"))
@@ -89,7 +101,7 @@ def create_db():
         print(f'Rows in products table:', row_count)
         history_products_df = pd.DataFrame(history_products_dict, columns=['ean', 'qty', 'date'])
         history_products_df.to_sql("history_products", connection, if_exists='append', index=False)
-        connection.commit()
+        #connection.commit()
         # Record the end time
         end_time = time.time()
 
@@ -191,7 +203,7 @@ def updatebd2():
     current_datetime = datetime.now()
     new_df['date'] = current_datetime
     new_df.to_sql("history_products", connection, if_exists='append', index=False)
-    connection.commit()
+    #connection.commit()
     print('Update table history product')
 
     for index, row in compared.iterrows():
@@ -203,7 +215,7 @@ def updatebd2():
         update_query = text(f"INSERT INTO products (ean, qty, symbol, model) VALUES ({ean}, {qty}, '{symbol}', '{model}') ON CONFLICT (ean) DO UPDATE SET qty = {qty}")
 
         connection.execute(update_query)
-    connection.commit()
+    #connection.commit()
 
     print('Update table Product')
     connection.close()

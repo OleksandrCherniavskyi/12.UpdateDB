@@ -1,12 +1,27 @@
 version: "3.8"
 services:
   db:
-    build: ./database/
+    build:
+      context: ./database/
+      dockerfile: Dockerfile
+    container_name: db
+    networks:
+      - djangonetwork
+
   app_back:
     build:
       context: ./parsing/
       dockerfile: Dockerfile
+    networks:
+      - djangonetwork
+
   app_front:
     build:
       context: .
       dockerfile: Dockerfile
+    networks:
+      - djangonetwork
+
+networks:
+  djangonetwork:
+    driver: bridge
