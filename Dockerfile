@@ -17,4 +17,4 @@ RUN pip install -r requirements.txt
 COPY . .
 
 # Specify the command to run your Django app
-CMD ["python", "store/manage.py", "runserver", "0.0.0.0:8080"]
+CMD ["cd", "store"]
